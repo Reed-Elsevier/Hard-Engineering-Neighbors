@@ -73,6 +73,7 @@ def network_signals(txn: dict, net: NetworkIndex) -> dict:
             "label": "Sender is a ring member",
             "detail": f"{acct} is held by {ind}, one of {len(net.rings[ring_id]['individuals'])} "
                       f"individuals in {ring_id} who share devices, phones or addresses.",
+            "metric": {"value": len(net.rings[ring_id]["individuals"]), "unit": "people in the ring"},
             "evidence_ids": [acct, ind, ring_id] + [x["record_id"] for x in links],
         })
 
@@ -84,6 +85,7 @@ def network_signals(txn: dict, net: NetworkIndex) -> dict:
             "label": "Counterparty looks like a mule (fan-in)",
             "detail": f"{cp} receives from {n} distinct accounts (typical is 1-3)"
                       + (f"; it is held by a member of {cp_ring}." if cp_ring else "."),
+            "metric": {"value": n, "unit": "accounts pay into it"},
             "evidence_ids": [cp] + ([cp_ring, net.holder_of.get(cp)] if cp_ring else []),
         })
 
@@ -92,6 +94,7 @@ def network_signals(txn: dict, net: NetworkIndex) -> dict:
             "name": "just_under_10k",
             "label": "Amount just under $10k",
             "detail": f"USD {float(amt):,.2f} sits just below the 10,000 reporting threshold.",
+            "metric": {"value": round(float(amt), 2), "unit": "USD, just under 10k"},
             "evidence_ids": [txn["txn_id"]] if txn.get("txn_id") else [],
         })
 

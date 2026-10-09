@@ -1,124 +1,81 @@
-import { Info, Network, ShieldQuestion } from "lucide-react"
+import {
+  ArrowDownToLine, ArrowLeftRight, Banknote, CalendarClock, CreditCard, Globe2, Info, ListFilter, ShieldCheck,
+  Siren, Smartphone, TrendingDown, TrendingUp, Trophy, UserRound, Users, Waypoints,
+} from "lucide-react"
 
-import type { Reason, ScoreResult } from "@/lib/api"
+import type { Reason, ScoreResult, Signal } from "@/lib/api"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { BandChip, RecordId, RecordIds, SectionTitle, pct, usd } from "./common"
+import { BandChip, Details, RecordId, RecordIds, SectionTitle, Term, pct, usd } from "./common"
 
-/** 0-100 meter with the Low/Med/High band thresholds marked (40, 80). */
-function ScoreMeter({ score }: { score: number }) {
+/** Warnings and data gaps, shown right under the verdict so they are not missed. */
+export function NotesAlert({ r }: { r: ScoreResult }) {
+  const notes = [...r.warnings.filter((w) => !w.startsWith("No network history")), ...r.data_gaps.map((g) => `Missing: ${g}`)]
+  if (!r.network.cold_start && notes.length === 0) return null
   return (
-    <div className="w-full" role="img" aria-label={`Risk score ${score} of 100`}>
-      <div className="relative h-3 w-full bg-viz-neutral">
-        <div className="absolute inset-y-0 left-0 bg-foreground" style={{ width: `${score}%` }} />
-        {[40, 80].map((t) => (
-          <div key={t} className="absolute inset-y-[-3px] w-0.5 bg-background" style={{ left: `${t}%` }} />
-        ))}
-      </div>
-      <div className="mt-1 grid grid-cols-[40fr_40fr_20fr] text-[0.65rem] tracking-wider text-muted-foreground uppercase">
-        <span>Low</span>
-        <span>Med</span>
-        <span>High</span>
-      </div>
-    </div>
+    <Alert>
+      <Info />
+      <AlertTitle>{r.network.cold_start ? "New account: no network history, so confidence is lower" : "Notes on this input"}</AlertTitle>
+      {notes.length > 0 && (
+        <AlertDescription>
+          <ul className="list-disc pl-4">{notes.map((w) => <li key={w}>{w}</li>)}</ul>
+        </AlertDescription>
+      )}
+    </Alert>
   )
 }
 
-export function ScoreSummary({ r }: { r: ScoreResult }) {
+export function RecordPanel({ r }: { r: ScoreResult }) {
   const t = r.txn
   return (
-    <div className="grid gap-6 md:grid-cols-[minmax(0,14rem)_1fr]">
-      <div className="flex flex-col gap-3">
-        <div className="flex items-end gap-2">
-          <span className="font-heading text-6xl leading-none font-semibold tabular-nums">{Math.round(r.score)}</span>
-          <span className="pb-1 text-sm text-muted-foreground">/ 100</span>
-        </div>
-        <BandChip band={r.band} />
-        <ScoreMeter score={r.score} />
-      </div>
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="tracking-widest text-muted-foreground uppercase">Layer fired</span>
-          {r.layers_fired.length ? (
-            r.layers_fired.map((l) => (
-              <span key={l} className="inline-flex items-center gap-1 border border-foreground px-2 py-0.5 font-semibold">
-                {l === "Network" ? <Network className="size-3.5" /> : <ShieldQuestion className="size-3.5" />}
-                {l}
-              </span>
-            ))
-          ) : (
-            <span className="text-muted-foreground">None. Neither layer found a reason for concern.</span>
-          )}
-        </div>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-          <Field label="Transaction">{t.txn_id ? <RecordId id={String(t.txn_id)} /> : "New"}</Field>
-          <Field label="Amount (USD)">{usd(t.amount_usd as number)}</Field>
-          <Field label="Channel">{(t.channel as string) ?? "—"}</Field>
-          <Field label="Sender">{t.account_id ? <RecordId id={String(t.account_id)} /> : "—"}</Field>
-          <Field label="Counterparty">
-            {t.counterparty_account_id ? <RecordId id={String(t.counterparty_account_id)} /> : "—"}
-          </Field>
-          <Field label="Cross-border">{t.is_cross_border ? "Yes" : "No"}</Field>
-        </dl>
-        {(r.warnings.length > 0 || r.data_gaps.length > 0) && (
-          <Alert>
-            <Info />
-            <AlertTitle>{r.network.cold_start ? "No network history - lower confidence" : "Notes"}</AlertTitle>
-            <AlertDescription>
-              <ul className="list-disc pl-4">
-                {[...r.warnings.filter((w) => !w.startsWith("No network history")), ...r.data_gaps.map((g) => `Data gap: ${g}`)].map(
-                  (w) => (
-                    <li key={w}>{w}</li>
-                  )
-                )}
-              </ul>
-            </AlertDescription>
-          </Alert>
-        )}
-      </div>
+    <div>
+      <SectionTitle>Transaction</SectionTitle>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+        <Field icon={CreditCard} label="Transaction">{t.txn_id ? <RecordId id={String(t.txn_id)} /> : "New"}</Field>
+        <Field icon={Banknote} label="Amount">
+          {usd(t.amount_usd as number)}
+          {t.currency && t.currency !== "USD" && <span className="text-muted-foreground"> ({String(t.currency)})</span>}
+        </Field>
+        <Field icon={UserRound} label="Sender account">{t.account_id ? <RecordId id={String(t.account_id)} /> : "—"}</Field>
+        <Field icon={ArrowLeftRight} label="Receiving account">{t.counterparty_account_id ? <RecordId id={String(t.counterparty_account_id)} /> : "—"}</Field>
+        <Field icon={Smartphone} label="Channel">{(t.channel as string) ?? "—"}</Field>
+        <Field icon={Globe2} label="Cross-border">{t.is_cross_border ? "Yes" : "No"}</Field>
+        <Field icon={CalendarClock} label="Date">{t.txn_ts ? String(t.txn_ts).slice(0, 16).replace("T", " ") : "—"}</Field>
+      </dl>
     </div>
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ icon: Icon, label, children }: { icon: typeof Info; label: string; children: React.ReactNode }) {
   return (
-    <div className="min-w-0">
-      <dt className="text-[0.65rem] tracking-widest text-muted-foreground uppercase">{label}</dt>
-      <dd className="truncate">{children}</dd>
+    <div className="flex min-w-0 gap-2">
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <div className="min-w-0">
+        <dt className="text-xs text-muted-foreground">{label}</dt>
+        <dd className="truncate">{children}</dd>
+      </div>
     </div>
   )
 }
 
-/** Diverging SHAP bars: warm pole raises the alert's likelihood, cool pole lowers it. */
-function ShapBars({ reasons }: { reasons: Reason[] }) {
+/** Diverging bars: warm pole raises the alert's likelihood, cool pole lowers it. */
+function FactorBars({ reasons }: { reasons: Reason[] }) {
   const max = Math.max(...reasons.map((x) => Math.abs(x.contribution)), 1e-6)
   return (
     <ul className="flex flex-col gap-2">
       {reasons.map((x) => {
         const w = (Math.abs(x.contribution) / max) * 50
         const up = x.contribution > 0
+        const val = x.value === null ? "missing" : typeof x.value === "number" ? +x.value.toFixed(2) : x.value
         return (
-          <li
-            key={x.feature}
-            className="grid grid-cols-[minmax(0,11rem)_1fr_4.5rem] items-center gap-3 text-xs"
-            title={`${x.label} ${x.direction} the likelihood (SHAP ${x.contribution.toFixed(3)})`}
-          >
-            <span className="truncate">
-              <span className="font-medium">{x.label}</span>
-              <span className="text-muted-foreground">
-                {" "}= {x.value === null ? "missing" : typeof x.value === "number" ? +x.value.toFixed(2) : x.value}
-              </span>
-            </span>
-            <span className="relative h-4">
+          <li key={x.feature} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.25rem] items-center gap-3 text-xs"
+            title={`${x.label} = ${val}: ${x.direction} the estimate (${x.contribution > 0 ? "+" : ""}${x.contribution.toFixed(2)})`}>
+            <span className="truncate"><span className="font-medium">{x.label}</span> <span className="text-muted-foreground">{val}</span></span>
+            <span className="relative h-3.5">
               <span className="absolute inset-y-0 left-1/2 w-px bg-border" />
-              <span
-                className={up ? "absolute inset-y-0.5 left-1/2 rounded-r-[4px] bg-shap-up" : "absolute inset-y-0.5 right-1/2 rounded-l-[4px] bg-shap-down"}
-                style={{ width: `${w}%` }}
-              />
+              <span className={up ? "absolute inset-y-0.5 left-1/2 rounded-r-[4px] bg-shap-up" : "absolute inset-y-0.5 right-1/2 rounded-l-[4px] bg-shap-down"}
+                style={{ width: `${w}%` }} />
             </span>
-            <span className="text-right text-muted-foreground tabular-nums">
-              {up ? "raises" : "lowers"} {x.contribution > 0 ? "+" : ""}
-              {x.contribution.toFixed(2)}
-            </span>
+            {up ? <TrendingUp className="size-4 text-shap-up" aria-label="raises" /> : <TrendingDown className="size-4 text-shap-down" aria-label="lowers" />}
           </li>
         )
       })}
@@ -128,59 +85,81 @@ function ShapBars({ reasons }: { reasons: Reason[] }) {
 
 const rankText = (p: number) => {
   const top = Math.max(1, Math.round((1 - p) * 100))
-  return top <= 10 ? `in the top ${top}% of past alerts` : `higher than ${pct(p)} of past alerts`
+  return top <= 10 ? `Top ${top}% of past alerts` : `Higher than ${pct(p)} of past alerts`
 }
 
 export function TriagePanel({ r }: { r: ScoreResult }) {
   const t = r.triage
-  if (!t.applied) {
-    return (
-      <div>
-        <SectionTitle>Triage model · is this alert real?</SectionTitle>
-        <p className="text-sm text-muted-foreground">{t.reason}</p>
-      </div>
-    )
-  }
+  if (!t.applied) return null
   return (
     <div>
-      <SectionTitle hint={<BandChip band={t.band} short />}>Triage model · is this alert real?</SectionTitle>
-      <p className="mb-3 text-sm">
-        Alert {t.alert_id ? <RecordId id={t.alert_id} /> : "(supplied)"} from rule <RecordId id={t.rule_id} />{" "}
-        <span className="text-muted-foreground">{t.rule_name}</span>. Chance it is real:{" "}
-        <strong>{pct(t.p_real, 1)}</strong>, {rankText(t.percentile)}.
+      <SectionTitle hint={<BandChip band={t.band} short />}>
+        <ListFilter className="mr-1 inline size-3.5" /><Term k="triage">Alert triage</Term> · is this alert real?
+      </SectionTitle>
+      <div className="mb-4 flex items-end gap-4">
+        <div>
+          <p className="font-heading text-4xl leading-none font-semibold tabular-nums">{pct(t.p_real)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">chance it is real</p>
+        </div>
+        <div className="flex flex-col gap-1 pb-0.5 text-xs">
+          <span className="inline-flex items-center gap-1.5"><Trophy className="size-3.5" aria-hidden />{rankText(t.percentile)}</span>
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <Siren className="size-3.5" aria-hidden />Rule <RecordId id={t.rule_id} /> {t.rule_name}
+          </span>
+        </div>
+      </div>
+      <p className="mb-2 text-xs text-muted-foreground">
+        Top <Term k="factors">factors</Term> · <TrendingUp className="inline size-3.5 text-shap-up" /> raises
+        {" "}<TrendingDown className="inline size-3.5 text-shap-down" /> lowers
       </p>
-      <ShapBars reasons={t.reasons} />
-      <p className="mt-2 text-[0.7rem] text-muted-foreground">Top 5 factors (SHAP). Red raises the likelihood; blue lowers it.</p>
+      <FactorBars reasons={t.reasons.slice(0, 3)} />
+      {t.reasons.length > 3 && (
+        <div className="mt-2"><Details label={`${t.reasons.length - 3} more factors`}><FactorBars reasons={t.reasons.slice(3)} /></Details></div>
+      )}
     </div>
   )
+}
+
+/** Plain-language face of each network signal (wording matches the pitch). */
+const SIGNAL_META: Record<Signal["name"], { title: React.ReactNode; Icon: typeof Users; format: (v: number) => string }> = {
+  ring_member_sender: { title: <>Sender is in a <Term k="ring">ring</Term></>, Icon: Users, format: (v) => String(v) },
+  fanin_mule_counterparty: { title: <>Money goes to a <Term k="collection">collection account</Term></>, Icon: ArrowDownToLine, format: (v) => String(v) },
+  just_under_10k: { title: <>Amount sits just under $10k</>, Icon: Banknote, format: (v) => `$${Math.round(v).toLocaleString()}` },
 }
 
 export function SignalsPanel({ r }: { r: ScoreResult }) {
   const s = r.network.signals
   return (
     <div>
-      <SectionTitle hint={<BandChip band={r.network.band} short />}>Network · what the rules can't see</SectionTitle>
+      <SectionTitle hint={<BandChip band={r.network.band} short />}>
+        <Waypoints className="mr-1 inline size-3.5" /><Term k="network">Network</Term> · what rules can't see
+      </SectionTitle>
       {s.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No network signals: the sender is not in a ring, the counterparty is not a collection account, and the amount is not just under $10k.
+        <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <ShieldCheck className="size-4 text-risk-low" aria-hidden />No links to a ring or a collection account.
         </p>
       ) : (
-        <ol className="flex flex-col gap-3">
-          {s.map((x, i) => (
-            <li key={x.name} className="grid grid-cols-[1.5rem_1fr] gap-2">
-              <span className="font-heading text-lg leading-none font-semibold">{i + 1}</span>
-              <div>
-                <p className="font-medium">{x.label}</p>
-                <p className="text-sm text-muted-foreground">{x.detail}</p>
-                {x.evidence_ids.length > 0 && (
-                  <div className="mt-1">
-                    <RecordIds ids={x.evidence_ids} max={6} />
-                  </div>
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {s.map((x) => {
+            const m = SIGNAL_META[x.name]
+            return (
+              <li key={x.name} className="flex flex-col gap-2 border border-border p-3">
+                <span className="flex size-8 items-center justify-center bg-risk-high/10 text-risk-high"><m.Icon className="size-4" aria-hidden /></span>
+                {x.metric && (
+                  <p>
+                    <span className="font-heading text-2xl font-semibold tabular-nums">{m.format(x.metric.value)}</span>
+                    <span className="ml-1.5 text-xs text-muted-foreground">{x.metric.unit}</span>
+                  </p>
                 )}
-              </div>
-            </li>
-          ))}
-        </ol>
+                <p className="text-sm font-medium">{m.title}</p>
+                <Details>
+                  <p className="mb-2 text-xs text-muted-foreground">{x.detail}</p>
+                  {x.evidence_ids.length > 0 && <RecordIds ids={x.evidence_ids} />}
+                </Details>
+              </li>
+            )
+          })}
+        </ul>
       )}
     </div>
   )

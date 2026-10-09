@@ -32,6 +32,7 @@ export type Signal = {
   label: string
   detail: string
   evidence_ids: string[]
+  metric?: { value: number; unit: string }
 }
 
 export type GraphNode =

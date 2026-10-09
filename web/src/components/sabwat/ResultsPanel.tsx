@@ -1,11 +1,14 @@
+import { BellOff, Filter, VolumeX, Waypoints } from "lucide-react"
+
 import type { Metrics } from "@/lib/api"
 import { SectionTitle, pct } from "./common"
 
 const NOISY = new Set(["R017", "R023"])
 
-function Tile({ value, label, sub }: { value: string; label: string; sub: string }) {
+function Tile({ icon: Icon, value, label, sub }: { icon: typeof BellOff; value: string; label: string; sub: string }) {
   return (
     <div className="border border-border p-4">
+      <span className="mb-3 flex size-8 items-center justify-center bg-muted"><Icon className="size-4" aria-hidden /></span>
       <p className="font-heading text-3xl font-semibold tabular-nums">{value}</p>
       <p className="mt-1 text-sm font-medium">{label}</p>
       <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
@@ -23,18 +26,18 @@ export function ResultsPanel({ m }: { m: Metrics }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile value={pct(m.baseline.fp_rate_strict, 1)} label="of rule alerts are false alarms"
-          sub={`Strict label (confirmed real or SAR / exit). Published figure ${pct(m.baseline.fp_rate_is_false_positive, 1)} uses a looser definition.`} />
-        <Tile value={t.at_90_recall_model.fp_avoided.toLocaleString()} label="false alarms skipped, 90% of real cases kept"
-          sub={`2026 hold-out: ${pct(t.at_90_recall_model.fp_avoided_pct)} of false alarms, vs ${t.at_90_recall_rule_score.fp_avoided.toLocaleString()} ranking by the rule score.`} />
-        <Tile value={`${asOf.flagged_high} of ${asOf.later_ring_transfers}`} label={`later ring transfers flagged, using data before ${cutoff}`}
-          sub={`Rules alerted on ${asOf.rules_alerted}; analysts confirmed ${asOf.rules_confirmed_real}.`} />
-        <Tile value={pct(m.noisy_rules.combined_share_of_alerts)} label="of all alerts come from two rules"
-          sub={`R017 and R023: ${pct(m.noisy_rules.combined_fp_rate, 1)} false alarms. Tuning them is a quick win.`} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Tile icon={BellOff} value={pct(m.baseline.fp_rate_strict, 1)} label="of rule alerts are false alarms"
+          sub={`Published figure ${pct(m.baseline.fp_rate_is_false_positive, 1)} uses a looser definition.`} />
+        <Tile icon={Filter} value={t.at_90_recall_model.fp_avoided.toLocaleString()} label="false alarms skipped, 90% of real cases kept"
+          sub={`${pct(t.at_90_recall_model.fp_avoided_pct)} of false alarms. Rule score alone: ${t.at_90_recall_rule_score.fp_avoided.toLocaleString()}.`} />
+        <Tile icon={Waypoints} value={`${asOf.flagged_high} of ${asOf.later_ring_transfers}`} label={`later ring transfers flagged (data before ${cutoff})`}
+          sub={`Rules alerted on ${asOf.rules_alerted}.`} />
+        <Tile icon={VolumeX} value={pct(m.noisy_rules.combined_share_of_alerts)} label="of all alerts come from two rules"
+          sub={`R017 and R023 are ${pct(m.noisy_rules.combined_fp_rate, 1)} false alarms.`} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[3fr_2fr]">
         <div>
           <SectionTitle hint="share of all alerts · label shows false-alarm rate">Busiest rules</SectionTitle>
           <ul className="flex flex-col gap-1.5">
