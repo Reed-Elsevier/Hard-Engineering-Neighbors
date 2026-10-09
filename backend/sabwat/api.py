@@ -17,6 +17,7 @@ def health() -> dict:
         "data_available": settings.risk_dir.is_dir(),
         "model_available": (settings.artifacts_dir / "model.pkl").is_file(),
         "llm_enabled": settings.llm_enabled,
+        "db_backend": settings.db_backend,
     }
 
 
