@@ -10,6 +10,7 @@ import logging
 import threading
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
@@ -28,13 +29,28 @@ from sabwat.core.score import get_engine
 log = logging.getLogger("sabwat")
 MAX_BATCH_ROWS = 2000
 
-_state: dict[str, Any] = {"engine_error": None}
+_state: dict[str, Any] = {"engine_error": None, "building": False}
 _store = get_store()
 _brief_cache = BriefCache()
 
 
+def _ensure_artifacts() -> None:
+    """Build the ring graph, FX table and model on first start if they are missing (~1 min)."""
+    if (settings.artifacts_dir / "model.pkl").is_file():
+        return
+    if not settings.data_available:
+        raise FileNotFoundError(f"No transactions.parquet under {settings.data_dir}; upload the data files")
+    _state["building"] = True
+    log.warning("artifacts missing: building from %s", settings.risk_dir)
+    import runpy
+
+    runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts" / "build.py"), run_name="__main__")
+    _state["building"] = False
+
+
 def _warm_engine() -> None:
     try:
+        _ensure_artifacts()
         get_engine()
     except Exception as e:  # surfaced through /api/health; never crashes the app
         log.exception("engine failed to load")
@@ -102,7 +118,10 @@ def health() -> dict:
     return {
         "status": "ok",
         "version": __version__,
-        "data_available": settings.risk_dir.is_dir(),
+        "data_available": settings.data_available,
+        "data_dir": str(settings.risk_dir.relative_to(settings.data_dir.parent))
+        if settings.risk_dir.is_relative_to(settings.data_dir.parent) else str(settings.risk_dir),
+        "building_model": _state["building"],
         "model_available": (settings.artifacts_dir / "model.pkl").is_file(),
         "engine_ready": loaded,
         "engine_error": _state["engine_error"],

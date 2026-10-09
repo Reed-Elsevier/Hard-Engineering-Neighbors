@@ -26,6 +26,18 @@ def _data_dir() -> Path:
     return REPO_ROOT / "data"
 
 
+def find_risk_dir(data_dir: Path) -> Path:
+    """First folder containing transactions.parquet: data_dir/D_risk, data_dir, then any subfolder."""
+    candidates = [data_dir / "D_risk", data_dir]
+    for root in (data_dir, REPO_ROOT / "data", REPO_ROOT / "Data"):
+        if root.is_dir():
+            candidates += [p.parent for p in sorted(root.rglob("transactions.parquet"))]
+    for c in candidates:
+        if (c / "transactions.parquet").is_file():
+            return c
+    return data_dir / "D_risk" if (data_dir / "D_risk").is_dir() else data_dir
+
+
 def _path(var: str, default: str) -> Path:
     p = Path(os.getenv(var) or default)
     return p if p.is_absolute() else REPO_ROOT / p
@@ -54,9 +66,15 @@ class Settings:
 
     @property
     def risk_dir(self) -> Path:
-        # Local: Data/D_risk/*.parquet. Deploy platform: uploads land flat in data/*.parquet.
-        sub = self.data_dir / "D_risk"
-        return sub if sub.is_dir() else self.data_dir
+        """Folder holding the risk parquet files, wherever they landed.
+
+        Local: Data/D_risk/. Deploy platform: uploads land in data/ (flat, or in a subfolder).
+        """
+        return find_risk_dir(self.data_dir)
+
+    @property
+    def data_available(self) -> bool:
+        return (self.risk_dir / "transactions.parquet").is_file()
 
     @property
     def llm_enabled(self) -> bool:

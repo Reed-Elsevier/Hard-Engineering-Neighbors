@@ -154,6 +154,8 @@ export type Health = {
   status: string
   version: string
   engine_ready: boolean
+  building_model?: boolean
+  data_available?: boolean
   engine_error: string | null
   llm_enabled: boolean
   llm_provider: string

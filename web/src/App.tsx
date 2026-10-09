@@ -23,7 +23,7 @@ function StatusLine({ health }: { health: Health | null }) {
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <span className="inline-flex items-center gap-1.5" title={health.engine_error ?? undefined}>
-        {dot(ready)}<Workflow className="size-3.5" />{ready ? "Engine ready" : health.engine_error ? "Engine error" : "Loading model…"}
+        {dot(ready)}<Workflow className="size-3.5" />{ready ? "Engine ready" : health.engine_error ? "Engine error" : health.building_model ? "Building model (first start, ~1 min)…" : "Loading model…"}
       </span>
       <span className="inline-flex items-center gap-1.5" title={health.llm_model ?? "No API key: template briefs"}>
         {dot(health.llm_enabled)}<Bot className="size-3.5" />{health.llm_enabled ? "AI writer on" : "AI writer off"}

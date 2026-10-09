@@ -21,8 +21,11 @@ RUN pip install -r backend/requirements.txt
 COPY . .
 RUN pip install -e backend
 COPY --from=web /web/dist web/dist
-# Build the ring graph, FX table and triage model now if the data is already here (else at start-up).
-RUN if ls data/*.parquet Data/D_risk/*.parquet >/dev/null 2>&1; then python backend/scripts/build.py; fi
+# Build the ring graph, FX table and triage model now if the data is already in the build context;
+# otherwise the app builds them on first start (the old `ls a b` check failed when one path was missing).
+RUN if python -c "from sabwat.config import settings as s; raise SystemExit(0 if s.data_available else 1)"; \
+    then python backend/scripts/build.py; \
+    else echo "No data at build time; the app will build artifacts on first start."; fi
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s CMD curl -fsS localhost:8000/api/health || exit 1

@@ -4,7 +4,11 @@ services:
     build: .
     ports:
       - "8000:8000"
-    # Secrets from the deploy platform pass straight through (unset ones are simply omitted).
+    # Secrets from the deploy platform: read from ./.env at run time if it exists (never baked into the
+    # image; .dockerignore excludes it), plus straight passthrough of the host environment.
+    env_file:
+      - path: .env
+        required: false
     environment:
       - LLM_PROVIDER
       - GEMINI_API_KEY
