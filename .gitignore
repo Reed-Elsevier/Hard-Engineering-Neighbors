@@ -1,0 +1,42 @@
+# --- Secrets: never commit ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Company data: never commit (synthetic, but event-restricted) ---
+Data/
+data/
+_judges_only/
+
+# --- Generated ---
+artifacts/
+*.db
+*.sqlite
+*.pkl
+logs/
+*.log
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# --- Node (web/ has its own .gitignore too) ---
+node_modules/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
