@@ -74,7 +74,19 @@ python backend/scripts/provision_aws.py   # tables + IAM role/instance profile s
 python backend/scripts/check_env.py       # should show both tables ACTIVE
 ```
 
-## Deploy (AWS EC2)
+## Deploy (hackathon platform) — recommended
+
+The event's *Hackathon Deploy* page builds this public repo with the root `Dockerfile` / `docker-compose.yml` (UI + API in one container on port 8000).
+
+1. **Repo:** paste the GitHub URL and the event access code.
+2. **Data files:** select the 13 files in `deploy-data/` (run the copy step below once) and tick *no real customer or personal data* (the dataset is synthetic). They are copied into `data/`; Sabwat finds them there automatically. Never commit them.
+   ```bash
+   mkdir -p deploy-data && for t in transactions accounts risk_alerts alert_rules investigations analyst_actions devices      identity_attributes addresses ownership_links watchlists individuals business_entities; do cp Data/D_risk/$t.parquet deploy-data/; done
+   ```
+3. **Secrets (Advanced options):** nothing is required. The platform's Claude on Bedrock writes briefs automatically (`BEDROCK_MODEL_ID` is provided). To use Gemini instead: `LLM_PROVIDER=gemini` and `GEMINI_API_KEY=...`.
+4. **Decision log:** SQLite inside the container (the default `DB_BACKEND=sqlite`). It resets on redeploy.
+
+## Deploy (own AWS EC2, alternative)
 
 Two commands from the laptop (Git Bash, fresh AWS keys in `.env`):
 

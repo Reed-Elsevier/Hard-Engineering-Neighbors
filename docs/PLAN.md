@@ -68,7 +68,7 @@ Scoring rule for B: `ring_member_sender` or `fanin_mule_counterparty` → High. 
 
 **Choice: DynamoDB (on-demand), not RDS.** The decision log is append-only key-value data. DynamoDB needs no VPC, security group or DB password. It authenticates with the same IAM credentials via `boto3`, which is already installed. It is ready in seconds and costs nothing at demo volume. RDS Postgres would take ~10 minutes to provision, plus subnet, security-group and password management, for no gain here.
 
-Verified 2026-10-08: the `.env` keys resolve to SSO role `AdministratorAccess` in account 719535286257, region `ap-southeast-1`. No DynamoDB tables or RDS instances exist. **The account is shared** (7 running EC2 instances, other teams' buckets), so:
+Verified 2026-10-08: the team's SSO credentials can create DynamoDB tables in the event's AWS account (region `ap-southeast-1`); no tables existed before. **The account is shared** (other teams' instances and buckets), so:
 
 * Every resource is named `sabwat-*` and tagged `Project=sabwat`. We never modify anything else.
 * Tables (created by `backend/scripts/provision_aws.py`, idempotent):

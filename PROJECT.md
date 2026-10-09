@@ -165,12 +165,7 @@ Data/                     # Company Parquet, gitignored, never committed
 
 ## **11\. Deployment (AWS)**
 
-* **Host:** Company-approved EC2 instance (Ubuntu, t3.medium or larger) in the shared account, region `ap-southeast-1`. Name and tag every resource `sabwat-*` / `Project=sabwat`; never modify other teams' resources.  
-* **Setup:** `git clone`, copy `Data/` in, create `.env`, then `bash deploy/ec2_setup.sh`. It creates the venv, installs `backend/requirements.txt`, builds `web/`, runs `backend/scripts/build.py`, and installs the systemd unit.  
-* **Run:** `uvicorn sabwat.api:app --app-dir backend --host 0.0.0.0 --port 8000` as the `sabwat` systemd service, so it survives SSH disconnects.  
-* **Network:** Security group opens **8000** to event IPs only.  
-* **Database:** DynamoDB tables `sabwat-decisions` and `sabwat-briefs`, created by `backend/scripts/provision_aws.py`.  
-* **Credentials:** the instance uses the `sabwat-ec2-profile` instance profile (role `sabwat-ec2-role`, DynamoDB access to `sabwat-*` tables only). No AWS keys go in the instance's `.env`. Locally, SSO session keys in `.env` are fine; refresh them when they expire.  
-* **Secrets:** `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY`) goes in `.env` on the instance and is never committed.  
-* **Data:** Copied to the instance from the event environment, not from GitHub, S3 or DynamoDB.  
-* **Timing:** Deploy a thin version by hour 3 and redeploy with `git pull` plus a service restart. Keep a local run as the demo fallback.
+* **Primary: the event's Hackathon Deploy platform.** It builds the public repo from the root `Dockerfile` / `docker-compose.yml` (one container, port 8000). The 13 `Data/D_risk` parquet files are uploaded through its form (copied into `data/`), never committed. Briefs use the platform's Claude on Bedrock with no key (`BEDROCK_MODEL_ID`), or Gemini via Secrets. Decisions go to SQLite in the container. Redeploys keep the same link unless secrets or advanced options change.
+* **Alternative: own EC2** (`deploy/launch_ec2.py` + `deploy/push.sh`): t3.small with the `sabwat-ec2-profile` role, security group limited to named IPs, DynamoDB decision log. Kept as a fallback.
+* **Secrets** are never committed; on the platform they go in *Advanced options → Secrets*.
+* **Fallbacks for the demo:** local run (`uvicorn` + `npm run dev`) and a backup recording.
