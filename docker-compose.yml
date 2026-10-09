@@ -1,0 +1,18 @@
+# One service: the Dockerfile builds the React UI and serves it from FastAPI on port 8000.
+services:
+  sabwat:
+    build: .
+    ports:
+      - "8000:8000"
+    # Secrets from the deploy platform pass straight through (unset ones are simply omitted).
+    environment:
+      - LLM_PROVIDER
+      - GEMINI_API_KEY
+      - GEMINI_MODEL
+      - GEMINI_FALLBACK_MODEL
+      - ANTHROPIC_API_KEY
+      - BEDROCK_MODEL_ID
+      - AWS_REGION
+      - AWS_BEARER_TOKEN_BEDROCK
+      - DB_BACKEND
+    restart: unless-stopped

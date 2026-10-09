@@ -66,3 +66,15 @@ def test_no_key_uses_template_without_calling(monkeypatch):
                                                            gemini_api_key=None))
     calls = fake(monkeypatch, [make(["ACC1"])])
     assert b.generate_brief(PACK)["source"] == "template" and calls == []
+
+
+def test_json_object_extraction():
+    assert b._json_object('Here you go:\n```json\n{"a": {"b": 1}}\n```') == '{"a": {"b": 1}}'
+    with pytest.raises(ValueError):
+        b._json_object("no json here")
+
+
+def test_bedrock_enabled_by_model_id():
+    s = dataclasses.replace(b.settings, llm_provider="bedrock", bedrock_model_id="anthropic.claude-x")
+    assert s.llm_enabled and s.llm_model == "anthropic.claude-x"
+    assert not dataclasses.replace(s, bedrock_model_id=None).llm_enabled

@@ -1,6 +1,7 @@
 """Analyst brief: evidence pack -> LLM (JSON-schema output) -> validated, or a deterministic template.
 
-Provider is LLM_PROVIDER: "gemini" (Google AI Studio key, default) or "anthropic" (Claude).
+Provider is LLM_PROVIDER: "gemini" (Google AI Studio key), "anthropic" (Claude API key) or
+"bedrock" (Claude on AWS Bedrock via the host's IAM role; default when BEDROCK_MODEL_ID is set).
 The score, reasons and graph never depend on this module. The LLM recommends; a human decides.
 
 Usage:  python -m sabwat.core.brief TXN00000001
@@ -199,8 +200,43 @@ def _call_claude(pack: dict, error: str | None, fallback: bool = False) -> Brief
     return Brief.model_validate_json(text)
 
 
-PROVIDERS = {"gemini": _call_gemini, "anthropic": _call_claude}
-SOURCE_NAME = {"gemini": "gemini", "anthropic": "claude"}
+def _json_object(text: str) -> str:
+    """The outermost {...} in a reply (models sometimes wrap JSON in prose or code fences)."""
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        raise ValueError("no JSON object in the response")
+    return text[start:end + 1]
+
+
+def _call_bedrock(pack: dict, error: str | None, fallback: bool = False) -> Brief:
+    """Claude on AWS Bedrock via the host's IAM role (no API key). BEDROCK_MODEL_ID picks the model."""
+    import boto3
+    from botocore.config import Config
+    from botocore.exceptions import BotoCoreError, ClientError
+
+    client = boto3.client("bedrock-runtime", region_name=settings.aws_region,
+                          config=Config(read_timeout=settings.llm_timeout_s, retries={"max_attempts": 1}))
+    prompt = (_prompt(pack, error) + "\n\nReply with ONLY a JSON object matching this JSON Schema, "
+              "no prose or code fences:\n" + json.dumps(SCHEMA))
+    try:
+        resp = client.converse(modelId=settings.bedrock_model_id, system=[{"text": SYSTEM}],
+                               messages=[{"role": "user", "content": [{"text": prompt}]}],
+                               inferenceConfig={"maxTokens": 4000})
+    except ClientError as e:
+        code = e.response["Error"]["Code"]
+        retryable = code in ("ThrottlingException", "ServiceUnavailableException", "ModelNotReadyException",
+                             "InternalServerException", "ModelTimeoutException")
+        raise LLMUnavailable(f"Bedrock {code}: {str(e)[:200]}", retryable=retryable) from e
+    except BotoCoreError as e:  # timeouts, connection errors, missing credentials
+        raise LLMUnavailable(f"Bedrock {type(e).__name__}: {str(e)[:200]}", retryable=True) from e
+    if resp.get("stopReason") == "max_tokens":
+        raise ValueError("response truncated at max_tokens")
+    text = "".join(b.get("text", "") for b in resp["output"]["message"]["content"])
+    return Brief.model_validate_json(_json_object(text))
+
+
+PROVIDERS = {"gemini": _call_gemini, "anthropic": _call_claude, "bedrock": _call_bedrock}
+SOURCE_NAME = {"gemini": "gemini", "anthropic": "claude", "bedrock": "claude"}
 
 
 def generate_brief(pack: dict) -> dict:

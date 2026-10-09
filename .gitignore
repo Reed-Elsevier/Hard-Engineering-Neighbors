@@ -40,3 +40,6 @@ desktop.ini
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Upload-ready copy of the parquet files the deploy platform needs (never committed)
+deploy-data/

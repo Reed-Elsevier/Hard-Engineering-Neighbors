@@ -1,0 +1,16 @@
+# Never ship secrets or local-only files into the image.
+.env
+.env.*
+!.env.example
+*.pem
+.git
+.venv
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+web/dist
+artifacts
+# Local copy of the full event package (other tracks, docs). Deploys use ./data uploads instead.
+Data
+deploy-data
