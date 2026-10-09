@@ -85,10 +85,12 @@ def template_brief(pack: dict) -> Brief:
     """Deterministic brief from the evidence pack (used when Claude is unavailable)."""
     sev = {"network_signal": "high", "watchlist": "high", "ring": "high", "ownership": "medium",
            "alert": "medium", "triage_reason": "low"}
+    reasons = [f for f in pack["facts"] if f["kind"] == "triage_reason"][:2]  # strongest two only
     findings = [Finding(finding=f["text"], evidence_ids=f["record_ids"],
                         severity=sev.get(f["kind"], "low"))
                 for f in pack["facts"]
                 if f["kind"] in sev and f["record_ids"]
+                and (f["kind"] != "triage_reason" or f in reasons)
                 and not f["text"].startswith("No network signals")][:6]
     if not findings:
         findings = [Finding(finding=pack["facts"][0]["text"],

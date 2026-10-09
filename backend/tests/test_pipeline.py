@@ -22,7 +22,7 @@ def client():
 @pytest.fixture(scope="module")
 def examples(client):
     ex = client.get("/api/examples").json()["examples"]
-    return {e["title"]: e["txn_id"] for e in ex}
+    return {e["title"]: e.get("txn_id") or e["transaction"] for e in ex}
 
 
 def score(client, **body):
@@ -85,7 +85,7 @@ def test_brief_falls_back_to_template_without_key(client, examples):
 def test_template_brief_only_cites_pack_ids(client, examples):
     from sabwat.core.score import get_engine
 
-    for tid in examples.values():
+    for tid in [v for v in examples.values() if isinstance(v, str)]:
         pack = build_evidence(get_engine().score({"txn_id": tid}))
         brief = template_brief(pack)
         validated, report = validate(brief, pack)

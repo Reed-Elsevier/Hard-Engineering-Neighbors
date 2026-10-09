@@ -4,6 +4,12 @@ The brief (LLM or template) may only cite IDs that appear here.
 """
 
 
+def rank_text(percentile: float) -> str:
+    """'in the top 3% of past alerts' / 'higher than 40% of past alerts'."""
+    top = max(1, round((1 - percentile) * 100))
+    return f"in the top {top}% of past alerts" if top <= 10 else f"higher than {percentile:.0%} of past alerts"
+
+
 def build_evidence(result: dict) -> dict:
     txn = result["txn"]
     tid = txn.get("txn_id") or "NEW-TXN"
@@ -29,8 +35,7 @@ def build_evidence(result: dict) -> dict:
         add("alert",
             f"Rule alert {trg['alert_id'] or '(supplied)'} from {trg['rule_id']} "
             f"'{trg['rule_name']}' with rule score {trg['alert_score']:.2f}. Triage model puts the "
-            f"chance this alert is real at {trg['p_real']:.1%} (higher than {trg['percentile']:.0%} "
-            f"of past alerts).",
+            f"chance this alert is real at {trg['p_real']:.1%} ({rank_text(trg['percentile'])}).",
             [trg["alert_id"], trg["rule_id"], tid])
         for r in trg["reasons"]:
             add("triage_reason",

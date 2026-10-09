@@ -125,6 +125,12 @@ def main() -> None:
          "note": "Alert later confirmed real; the triage model puts it at the top of the queue."},
         {"txn_id": noisy_fp.sort_values("p")["txn_id"].iloc[0], "title": "Noisy rule, safe to deprioritise",
          "note": f"{noisy_fp['rule_id'].iloc[0]} alert closed as a false positive."},
+        {"title": "New sender, collection account",
+         "note": "A sender Sabwat has never seen pays one of the ring's collection accounts.",
+         "transaction": {"account_id": "ACC0999999",
+                         "counterparty_account_id": demo["counterparty_account_id"].iloc[-1],
+                         "amount": 250000, "currency": "PHP", "channel": "Mobile wallet",
+                         "is_cross_border": False}},
     ]
 
     acts = table("analyst_actions")
@@ -183,7 +189,7 @@ def main() -> None:
           metrics["noisy_rules"]["combined_fp_rate"])
     for a in metrics["as_of"]:
         print("as-of:", a)
-    print("examples:", [e["txn_id"] for e in examples])
+    print("examples:", [e.get("txn_id") or e["title"] for e in examples])
     print(f"build done in {time.time() - t0:.0f}s")
 
 

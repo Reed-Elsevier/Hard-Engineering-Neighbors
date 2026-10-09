@@ -143,7 +143,7 @@ def _batch_rows(records: list[dict]) -> list[dict]:
     for i, rec in enumerate(records, start=1):
         try:
             r = eng.score(rec)
-            out.append({"row": i, "txn_id": r["txn"].get("txn_id"),
+            out.append({"row": i, "input": rec, "txn_id": r["txn"].get("txn_id"),
                         "account_id": r["txn"].get("account_id"),
                         "amount_usd": r["txn"].get("amount_usd"),
                         "score": r["score"], "band": r["band"], "layers_fired": r["layers_fired"],
@@ -151,7 +151,7 @@ def _batch_rows(records: list[dict]) -> list[dict]:
                         "triage_p_real": r["triage"].get("p_real"),
                         "warnings": r["warnings"] + r["data_gaps"], "error": None})
         except InputError as e:
-            out.append({"row": i, "txn_id": rec.get("txn_id"), "score": None, "band": None,
+            out.append({"row": i, "input": rec, "txn_id": rec.get("txn_id"), "score": None, "band": None,
                         "layers_fired": [], "signals": [], "error": str(e)})
     out.sort(key=lambda r: (r["score"] is None, -(r["score"] or 0)))
     return out
