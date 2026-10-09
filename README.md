@@ -34,6 +34,7 @@ pip install -r backend/requirements-dev.txt -e backend
 # 3. Data: copy the event data package into ./Data (must contain Data/D_risk/*.parquet)
 python backend/scripts/check_env.py      # preflight: deps, data, keys, AWS identity
 python backend/scripts/inspect_data.py   # table shapes + rule-engine baseline
+python backend/scripts/build.py          # ~45 s: ring/fan-in graph, FX, triage model, metrics -> artifacts/
 
 # 4. Web
 cd web && npm install && cd ..
@@ -50,6 +51,10 @@ cd web && npm run dev                    # http://localhost:5173 (proxies /api â
 cd web && npm run build && cd ..
 uvicorn sabwat.api:app --app-dir backend --port 8000   # http://localhost:8000
 ```
+
+## Demo
+
+Open `http://localhost:8000/?id=TXN00000241` to score a transaction on load (alert IDs such as `ALR0000001` work too). The example cards at the top load the four pitch scenarios. Without `ANTHROPIC_API_KEY` the brief uses the labelled template fallback; everything else works offline.
 
 ## Test
 

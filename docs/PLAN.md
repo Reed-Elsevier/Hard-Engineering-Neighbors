@@ -39,9 +39,11 @@ Scoring rule for B: `ring_member_sender` or `fanin_mule_counterparty` → High. 
 * **One label definition used everywhere (strict):** real = alert `Closed - True Positive`, or an investigation outcome of `SAR-like` or `Account exited`. Rows that are `Open` are excluded.
   * Under this label the **rule-engine baseline FP rate is 93.6%**. The package's 84.2% uses `is_false_positive`, where Monitoring and Escalated-then-no-action count as "not FP". The deck quotes 93.6% and footnotes 84.2% as the published figure under a looser definition.
 * **Label-only fields (never features):** `risk_alerts.disposition`, `is_false_positive`, `closed_at`, `analyst_employee_id`; everything in `investigations`, `analyst_actions`, `kyc_cases.outcome`.
-* **Layer A features:** `rule_id`, alert `score`, `amount_usd`, hour, `is_cross_border`, channel, account age, `just_under_10k`, `ring_member_sender`, `fanin_mule_counterparty`. Graph features are built from **training-period edges only**.
+* **Layer A features:** `rule_id`, alert `score`, `amount_usd`, hour, `is_cross_border`, channel, merchant category, account type, account age, `just_under_10k`, has-counterparty, has-device. **Ring/mule flags were dropped from layer A:** rebuilt from pre-2026 edges only, the ring has 1 account and there are 0 mules (the ring forms Nov 2025 to Apr 2026), so they would be all zero in training. Layer B carries them.
 * **Split:** train on alerts created ≤ 2025-12-31, test on 2026.
-* Quick check (2026 hold-out, no tuning, no graph features): AUC **0.615**. By gain, `score` and `amount_usd` outrank `rule_id`. The review said `rule_id` dominated; this didn't reproduce. Its population argument holds either way. Expect A to give modest lift and B to carry the demo.
+* **Measured (2026 hold-out, `scripts/build.py`):** AUC **0.65** vs 0.52 for the rule-engine score. At 90% recall: **2,844 FPs avoided (26%)** vs 1,280 (12%) ranking by rule score. Precision@100: 0.10 vs 0.13 (the model loses this one; report as-is).
+* **Layer B:** 488 High flags, 471 of them ring txns, 364 never alerted. **As-of 2026-03-01** (network rebuilt from earlier data only): 315 of the ring's 420 later transfers flagged High; rules alerted on 113, 26 confirmed real.
+* Noisy rules under the strict label: R017 + R023 = 30.8% of alerts at **97.7%** FP.
 
 ## 3. Input normalization
 
@@ -86,22 +88,22 @@ Prep (allowed before the event: environment only, no Sabwat screens):
 | # | Task | Status |
 |---|---|---|
 | W0 | Rewrite the **body** of PROJECT.md with these decisions and delete the override header | ✅ No Streamlit / 8501 / `inspect.py` / lowercase-ID instructions left; hop distance appears only as a non-feature |
-| W1 | `provision_aws.py`: create `sabwat-decisions` + `sabwat-briefs`, tags, IAM role + instance profile | Script written ✅. **Run pending your approval** (see README). Done when `check_env.py` shows both tables ACTIVE and a re-run prints `[exists]` |
+| W1 | `provision_aws.py`: create `sabwat-decisions` + `sabwat-briefs`, tags, IAM role + instance profile | ✅ Both tables ACTIVE (verified via `check_env.py`) |
 | W2 | `core/db.py` with DynamoDB + SQLite backends and fallback | ✅ pytest green (SQLite, fake DynamoDB table, fallback on ExpiredToken) |
 
 Build (onsite):
 
 | # | Task | Done when |
 |---|---|---|
-| B1 | `core/graph.py`: shared-attribute components (ring), fan-in table, 1-hop/Nominee ownership lookup | Prints ring of 15 / 49 accounts / 23 mules |
-| B2 | `scripts/build.py`: `artifacts/graph_features.parquet` (training-period edges), FX table, label table | < 2 min |
-| B3 | `core/model.py`: layer A train + `metrics.json` (FP avoided @90% recall, P@100, noisy rules) | Metrics file written |
-| B4 | `core/network.py`: layer B signals with record IDs | Demo txn (never alerted, ring) → High via B |
-| B5 | `core/score.py`: combine A/B, band, `layers_fired` | CLI on 3 IDs: alerted-real, alerted-FP, unalerted-ring |
-| B6 | `core/normalize.py` + `tests/sample_inputs/` (good, messy, unknown, PHP amount) | pytest green |
-| B7 | `core/evidence.py` + `core/brief.py`: Claude (validated JSON, 20 s timeout, 2 retries) with template fallback; cache in `sabwat-briefs` | Works with the key unset |
-| B8 | API: `/api/score`, `/api/score/batch`, `/api/decision`, `/api/metrics`, `/api/rules/noisy` | pytest green |
-| B9 | **One-page UI:** input (ID / form / JSON / CSV) → score + "layer fired" → SHAP / signals → ring graph → ownership panel → brief → Escalate/Review/Dismiss | Decision in < 60 s on the demo transaction |
+| B1 ✅ | `core/graph.py`: shared-attribute components (ring), fan-in table, 1-hop/Nominee ownership lookup | Prints ring of 15 / 49 accounts / 23 mules |
+| B2 ✅ | `scripts/build.py`: `artifacts/graph_features.parquet` (training-period edges), FX table, label table | < 2 min |
+| B3 ✅ | `core/model.py`: layer A train + `metrics.json` (FP avoided @90% recall, P@100, noisy rules) | Metrics file written |
+| B4 ✅ | `core/network.py`: layer B signals with record IDs | Demo txn (never alerted, ring) → High via B |
+| B5 ✅ | `core/score.py`: combine A/B, band, `layers_fired` | CLI on 3 IDs: alerted-real, alerted-FP, unalerted-ring |
+| B6 ✅ | `core/normalize.py` + `tests/sample_inputs/` (good, messy, unknown, PHP amount) | pytest green |
+| B7 ✅ (template path tested; Claude path needs `ANTHROPIC_API_KEY`) | `core/evidence.py` + `core/brief.py`: Claude (validated JSON, 20 s timeout, 2 retries) with template fallback; cache in `sabwat-briefs` | Works with the key unset |
+| B8 ✅ | API (+ `/api/record/{id}`, `/api/examples`, alert-ID lookup): `/api/score`, `/api/score/batch`, `/api/decision`, `/api/metrics`, `/api/rules/noisy` | pytest green |
+| B9 ✅ | **One-page UI** (+ `?id=` deep link, results panel, light/dark): input (ID / form / JSON / CSV) → score + "layer fired" → SHAP / signals → ring graph → ownership panel → brief → Escalate/Review/Dismiss | Decision in < 60 s on the demo transaction |
 | B10 | Deploy to EC2 with `sabwat-ec2-profile`; security group opens 8000 to event IPs; phone smoke test; backup recording | Public URL works; decision appears in `sabwat-decisions` |
 
 ## 7. How these numbers were checked

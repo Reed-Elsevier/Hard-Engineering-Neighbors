@@ -58,7 +58,7 @@ Input (ID | form | JSON | CSV) → `normalize.py` → `features.py` (lookup prec
 
 * **Offline step** (`backend/scripts/build.py`, run once, \~2 min): builds the graphs, writes `artifacts/graph_features.parquet`, trains and saves `artifacts/model.pkl`, and writes `artifacts/metrics.json`.  
 * **Libraries:** pandas, pyarrow, networkx, lightgbm, shap, scikit-learn, anthropic, pydantic, fastapi, uvicorn, boto3, python-dotenv. Front end: Vite, React, shadcn/ui (preset `b2trkIJUvo`).  
-* **LLM:** Claude via the Anthropic API. Model ID is set in `.env`, temperature is 0\.  
+* **LLM:** Claude via the Anthropic API. Model ID is set in `.env` (default `claude-opus-5-5`, effort `low` for latency). Opus 5.5 has no temperature setting and rejects forced tool use, so output is constrained with structured outputs (a JSON schema) and validated in code. Server-side refusal fallback (`fallbacks: "default"`) is on.  
 * **Serving:** one uvicorn process on **port 8000** serves the API at `/api` and the built UI (`web/dist`) at `/`.
 
 ```
@@ -77,7 +77,7 @@ Data/                     # Company Parquet, gitignored, never committed
 ## **5\. AI pipeline**
 
 * **Label (one definition, used everywhere):** a transaction is real fraud if its alert is `Closed - True Positive` or its investigation outcome is `Suspicious activity report filed (SAR-like)` or `Account exited`. Alerts or investigations still `Open` are excluded. Transactions have no label of their own.  
-* **Layer A, triage model (alerted transactions only):** LightGBM with SHAP top-5. Features: `rule_id`, alert `score`, `amount_usd`, hour, `is_cross_border`, channel, account age, plus the layer B flags. Uses a **time-based split** (train on alerts created ≤ 2025-12-31, test on 2026). A non-alerted transaction never goes through layer A, because it sits outside the training population.  
+* **Layer A, triage model (alerted transactions only):** LightGBM with SHAP top-5. Features: `rule_id`, alert `score`, `amount_usd`, hour, `is_cross_border`, channel, merchant category, account type, account age, `just_under_10k`. Ring and mule flags are **not** layer A features: the ring only appears from Nov 2025, so under the time split they are all zero in training. Layer B covers them. Uses a **time-based split** (train on alerts created ≤ 2025-12-31, test on 2026). A non-alerted transaction never goes through layer A, because it sits outside the training population.  
 * **Layer B, network signals (any transaction):** deterministic, each signal carries record IDs:  
   * `ring_member_sender`: the sender's holder is in a shared-attribute component (shared device fingerprint, identity hash, or address \+ postcode).  
   * `fanin_mule_counterparty`: the counterparty receives from ≥10 distinct accounts.  
@@ -87,7 +87,7 @@ Data/                     # Company Parquet, gitignored, never committed
 * **Not features:** watchlist hop distance (no signal in the data); any field from `investigations`, `analyst_actions`, `kyc_cases.outcome`, or `risk_alerts.disposition` / `is_false_positive` / `closed_at` / `analyst_employee_id`. These are labels only.  
 * **Displayed score:** `max(A, B)` on 0–100, with the band and the list of layers that fired.  
 * **LLM input:** An `evidence_pack` JSON containing only computed facts. Each fact carries a `record_id` (txn, account, device, entity, watchlist ID). Raw PII fields (names, addresses, phones) are never sent; IDs and attribute types are enough.  
-* **Prompt strategy:** The system prompt says: "You are an AML investigation assistant. Use ONLY the evidence provided. Cite record IDs in every finding. If evidence is insufficient, say so. You recommend; a human decides." Output is forced through a tool/JSON schema.  
+* **Prompt strategy:** The system prompt says: "You are an AML investigation assistant. Use ONLY the evidence provided. Cite record IDs in every finding. If evidence is insufficient, say so. You recommend; a human decides." Output is constrained by a JSON schema (structured outputs).  
 * **Output schema:**
 
 {"risk\_summary": "string (≤60 words)",  
@@ -129,6 +129,7 @@ Data/                     # Company Parquet, gitignored, never committed
 | Rule-engine baseline FP rate under the strict label (§5) | 93.6% (the package's 84.2% uses `is_false_positive`; footnote only) |
 | Precision@top-100 flagged (layer A) | Beats rule-engine queue order |
 | Ring transactions flagged by layer B that the rules never alerted | Report % of 471 |
+| **As-of:** network built only from data before a cutoff, applied to the ring's later transfers, vs rule alerts | 2026-03-01: 315 of 420 High; rules alerted 113, 26 confirmed |
 | Noisy-rule report: share of alerts and FP rate of R017 \+ R023 | 30.8% of alerts, 94.5% FP |
 | Brief grounding: findings with valid evidence IDs (validator \+ manual check of 10\) | 100% after validation |
 | End-to-end latency, p95 (score \+ brief) | ≤15 s |
@@ -152,14 +153,14 @@ Data/                     # Company Parquet, gitignored, never committed
 ## **10\. Build order (each step runnable on its own)**
 
 1. `scripts/inspect_data.py`: load the Parquet risk tables, print shapes and columns, compute the baseline FP rate. *(done)*  
-2. `core/graph.py`: build the shared-attribute graph (device, identity-hash and address edges only); print the ring (15 individuals, 49 accounts), the fan-in table (23 mules), and the 1-hop/Nominee ownership lookup.  
-3. `scripts/build.py`: write graph features to `artifacts/graph_features.parquet`, plus the FX and label tables.  
-4. `core/model.py`: train layer A on the time split; write `metrics.json` (FP avoided at 90% recall, P@100, noisy rules).  
-5. `core/network.py`: layer B signals with record IDs; the demo transaction (never alerted, ring) comes out High.  
-6. `core/score.py`: combine A and B into score, band and layers fired; CLI test on 3 IDs (alerted-real, alerted-FP, unalerted-ring).  
-7. `core/normalize.py`: normalize messy and unknown inputs; test against `tests/sample_inputs/`.  
-8. `core/brief.py`: evidence pack → Claude → validated JSON, with retries and fallback; CLI test with the API key unset to confirm the fallback works.  
-9. API endpoints and the one-page UI: input → score and layer fired → reasons/signals → ring graph → ownership panel → brief → decision buttons → DynamoDB.  
+2. `core/graph.py`: build the shared-attribute graph (device, identity-hash and address edges only); print the ring (15 individuals, 49 accounts), the fan-in table (23 mules), and the 1-hop/Nominee ownership lookup. *(done)*  
+3. `scripts/build.py`: write graph features to `artifacts/graph_features.parquet`, plus the FX and label tables. *(done)*  
+4. `core/model.py`: train layer A on the time split; write `metrics.json` (FP avoided at 90% recall, P@100, noisy rules). *(done)*  
+5. `core/network.py`: layer B signals with record IDs; the demo transaction (never alerted, ring) comes out High. *(done)*  
+6. `core/score.py`: combine A and B into score, band and layers fired; CLI test on 3 IDs (alerted-real, alerted-FP, unalerted-ring). *(done)*  
+7. `core/normalize.py`: normalize messy and unknown inputs; test against `tests/sample_inputs/`. *(done)*  
+8. `core/brief.py`: evidence pack → Claude → validated JSON, with retries and fallback; CLI test with the API key unset to confirm the fallback works. *(done)*  
+9. API endpoints and the one-page UI: input → score and layer fired → reasons/signals → ring graph → ownership panel → brief → decision buttons → DynamoDB. *(done)*  
 10. Deploy to AWS EC2, run an end-to-end smoke test from a phone, record the backup demo, finalize README and write-up.
 
 ## **11\. Deployment (AWS)**
