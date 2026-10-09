@@ -1,0 +1,47 @@
+"""Preflight: confirm Python deps, data, secrets and AWS credentials are in place.
+
+Usage:  python backend/scripts/check_env.py
+Never prints secret values, only whether they are set.
+"""
+
+import importlib
+import os
+import sys
+
+from sabwat.config import settings
+
+DEPS = ["pandas", "pyarrow", "lightgbm", "shap", "networkx", "sklearn", "anthropic", "pydantic",
+        "fastapi", "boto3"]
+
+
+def check(label: str, ok: bool, detail: str = "") -> bool:
+    print(f"[{'OK ' if ok else '!! '}] {label}{'  - ' + detail if detail else ''}")
+    return ok
+
+
+def main() -> int:
+    ok = check("python", sys.version_info >= (3, 11), sys.version.split()[0])
+    for mod in DEPS:
+        try:
+            m = importlib.import_module(mod)
+            check(mod, True, getattr(m, "__version__", ""))
+        except ImportError as e:
+            ok = check(mod, False, str(e)) and ok
+    ok = check("data dir", settings.risk_dir.is_dir(), str(settings.risk_dir)) and ok
+    check("ANTHROPIC_API_KEY", settings.llm_enabled, "unset -> template-brief fallback")
+
+    aws_set = all(os.getenv(k) for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"))
+    if check("AWS keys in env", aws_set, "needed for deploy only"):
+        try:
+            import boto3
+            from botocore.exceptions import BotoCoreError, ClientError
+
+            ident = boto3.client("sts").get_caller_identity()
+            check("AWS STS identity", True, ident["Arn"])
+        except (BotoCoreError, ClientError) as e:  # expired session token is the usual cause
+            check("AWS STS identity", False, type(e).__name__ + ": " + str(e)[:120])
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,16 @@
+# Runtime (pinned; verified on Python 3.14)
+pandas==3.0.6
+pyarrow==25.0.1
+duckdb==1.5.6
+numpy==2.5.3
+scikit-learn==1.9.1
+lightgbm==4.7.0
+shap==0.52.0
+networkx==3.7
+anthropic==1.12.1
+pydantic==2.14.0
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+python-dotenv==1.2.4
+python-multipart==0.0.32
+boto3==1.43.110

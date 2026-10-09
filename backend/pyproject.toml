@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sabwat"
+version = "0.1.0"
+description = "Sabwat - fraud ring intelligence for Sentinel Risk analysts"
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+include = ["sabwat*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
