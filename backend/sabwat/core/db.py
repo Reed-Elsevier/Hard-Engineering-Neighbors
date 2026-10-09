@@ -33,7 +33,7 @@ class Decision(BaseModel):
     score: float | None = None
     band: Literal["Low", "Med", "High"] | None = None
     layers_fired: list[str] = Field(default_factory=list)
-    brief_source: Literal["claude", "template"] | None = None
+    brief_source: Literal["gemini", "claude", "template"] | None = None
     model_version: str | None = None
     decided_at: str = Field(default_factory=_now)
 

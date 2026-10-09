@@ -93,7 +93,7 @@ class DecisionRequest(BaseModel):
     score: float | None = None
     band: Literal["Low", "Med", "High"] | None = None
     layers_fired: list[str] = Field(default_factory=list)
-    brief_source: Literal["claude", "template"] | None = None
+    brief_source: Literal["gemini", "claude", "template"] | None = None
 
 
 @app.get("/api/health")
@@ -107,7 +107,8 @@ def health() -> dict:
         "engine_ready": loaded,
         "engine_error": _state["engine_error"],
         "llm_enabled": settings.llm_enabled,
-        "llm_model": settings.anthropic_model if settings.llm_enabled else None,
+        "llm_provider": settings.llm_provider,
+        "llm_model": settings.llm_model if settings.llm_enabled else None,
         "db_backend": _store.name,
     }
 
@@ -130,7 +131,7 @@ def brief(req: ScoreRequest) -> dict:
     if tid and (hit := _brief_cache.get(tid, key)):
         return {**hit, "cached": True}
     out = generate_brief(pack)
-    if tid and out["source"] == "claude":
+    if tid and out["source"] != "template":
         _brief_cache.put(tid, key, out)
     return {**out, "cached": False}
 

@@ -85,7 +85,7 @@ export type Brief = {
 
 export type BriefResult = {
   brief: Brief
-  source: "claude" | "template"
+  source: "gemini" | "claude" | "template"
   label: string
   validation: { findings_dropped?: number; warnings?: string[]; error?: string; attempts?: number }
   latency_s: number
@@ -155,6 +155,7 @@ export type Health = {
   engine_ready: boolean
   engine_error: string | null
   llm_enabled: boolean
+  llm_provider: string
   llm_model: string | null
   db_backend: string
 }
@@ -207,7 +208,7 @@ export const api = {
     score: number
     band: Band
     layers_fired: string[]
-    brief_source: "claude" | "template" | null
+    brief_source: "gemini" | "claude" | "template" | null
   }) => post<{ stored_in: string }>("/decision", body),
   record: (id: string) => call<{ type: string; id: string; fields: Record<string, unknown> }>(`/record/${encodeURIComponent(id)}`),
 }

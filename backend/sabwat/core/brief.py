@@ -1,6 +1,7 @@
-"""Analyst brief: evidence pack -> Claude (structured JSON) -> validated, or a deterministic template.
+"""Analyst brief: evidence pack -> LLM (JSON-schema output) -> validated, or a deterministic template.
 
-The score, reasons and graph never depend on this module. Claude recommends; a human decides.
+Provider is LLM_PROVIDER: "gemini" (Google AI Studio key, default) or "anthropic" (Claude).
+The score, reasons and graph never depend on this module. The LLM recommends; a human decides.
 
 Usage:  python -m sabwat.core.brief TXN00000001
 """
@@ -10,7 +11,6 @@ import logging
 import time
 from typing import Literal
 
-import anthropic
 from pydantic import BaseModel, Field, ValidationError
 
 from sabwat.config import settings
@@ -107,7 +107,15 @@ def template_brief(pack: dict) -> Brief:
     )
 
 
-def _call_claude(client: anthropic.Anthropic, pack: dict, error: str | None) -> Brief:
+class LLMUnavailable(Exception):
+    """Provider/API failure. `retryable` is False for errors that will not fix themselves."""
+
+    def __init__(self, message: str, retryable: bool):
+        super().__init__(message)
+        self.retryable = retryable
+
+
+def _prompt(pack: dict, error: str | None) -> str:
     prompt = ("Write the analyst brief for this evidence pack.\n\n<evidence_pack>\n"
               + json.dumps({k: pack[k] for k in ("txn_id", "score", "band", "layers_fired", "facts")},
                            indent=1)
@@ -115,50 +123,114 @@ def _call_claude(client: anthropic.Anthropic, pack: dict, error: str | None) -> 
     if error:
         prompt += (f"\n\nYour previous answer failed validation: {error}. Every evidence_ids entry "
                    f"must be one of: {', '.join(pack['allowed_ids'])}.")
-    resp = client.beta.messages.create(
-        model=settings.anthropic_model,
-        max_tokens=4000,
-        system=SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
-        output_config={"effort": settings.anthropic_effort,
-                       "format": {"type": "json_schema", "schema": SCHEMA}},
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-    )
+    return prompt
+
+
+def _call_gemini(pack: dict, error: str | None, fallback: bool = False) -> Brief:
+    """Gemini (Google AI Studio key) with a JSON-schema-constrained response.
+
+    `fallback` switches to GEMINI_FALLBACK_MODEL (free-tier models are often overloaded: 503).
+    """
+    import httpx
+    from google import genai
+    from google.genai import errors, types
+
+    client = genai.Client(api_key=settings.gemini_api_key,
+                          http_options=types.HttpOptions(timeout=int(settings.llm_timeout_s * 1000)))
+    try:
+        resp = client.models.generate_content(
+            model=_gemini_model(fallback),
+            contents=_prompt(pack, error),
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM,
+                response_mime_type="application/json",
+                response_json_schema=SCHEMA,
+                temperature=0,
+                max_output_tokens=4000,
+            ),
+        )
+    except errors.ClientError as e:  # 4xx: bad key/model are fatal; 429 quota is retryable
+        raise LLMUnavailable(f"Gemini {e.code}: {str(e)[:200]}", retryable=e.code == 429) from e
+    except (errors.ServerError, httpx.HTTPError) as e:
+        raise LLMUnavailable(f"Gemini {type(e).__name__}: {str(e)[:200]}", retryable=True) from e
+    if resp.prompt_feedback and resp.prompt_feedback.block_reason:
+        raise ValueError(f"prompt blocked ({resp.prompt_feedback.block_reason})")
+    finish = resp.candidates[0].finish_reason if resp.candidates else None
+    if finish is not None and finish.name not in ("STOP", "FINISH_REASON_UNSPECIFIED"):
+        raise ValueError(f"response ended early ({finish.name})")
+    if not resp.text:
+        raise ValueError("empty response")
+    return Brief.model_validate_json(resp.text)
+
+
+def _gemini_model(fallback: bool) -> str:
+    return (settings.gemini_fallback_model or settings.gemini_model) if fallback else settings.gemini_model
+
+
+def _call_claude(pack: dict, error: str | None, fallback: bool = False) -> Brief:
+    """Claude with structured outputs (Opus 5.5: no temperature, no forced tool use)."""
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=settings.anthropic_api_key,
+                                 timeout=settings.llm_timeout_s, max_retries=0)
+    try:
+        resp = client.beta.messages.create(
+            model=settings.anthropic_model,
+            max_tokens=4000,
+            system=SYSTEM,
+            messages=[{"role": "user", "content": _prompt(pack, error)}],
+            output_config={"effort": settings.anthropic_effort,
+                           "format": {"type": "json_schema", "schema": SCHEMA}},
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+        )
+    except anthropic.RateLimitError as e:
+        raise LLMUnavailable(f"Claude rate limited: {str(e)[:200]}", retryable=True) from e
+    except anthropic.APIStatusError as e:
+        raise LLMUnavailable(f"Claude {e.status_code}: {str(e)[:200]}",
+                             retryable=e.status_code >= 500) from e
+    except anthropic.APIConnectionError as e:  # includes timeouts
+        raise LLMUnavailable(f"Claude connection: {str(e)[:200]}", retryable=True) from e
     if resp.stop_reason == "refusal":
         raise ValueError(f"model declined ({getattr(resp.stop_details, 'category', None)})")
     if resp.stop_reason == "max_tokens":
         raise ValueError("response truncated at max_tokens")
-    text = next(b.text for b in resp.content if b.type == "text")
+    text = next((b.text for b in resp.content if b.type == "text"), "")
     return Brief.model_validate_json(text)
 
 
+PROVIDERS = {"gemini": _call_gemini, "anthropic": _call_claude}
+SOURCE_NAME = {"gemini": "gemini", "anthropic": "claude"}
+
+
 def generate_brief(pack: dict) -> dict:
-    """Returns {"brief", "source": "claude"|"template", "label", "validation", "latency_s"}."""
+    """Returns {"brief", "source": "gemini"|"claude"|"template", "label", "validation", "latency_s"}."""
     t0 = time.monotonic()
     error = None
-    if settings.llm_enabled:
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key,
-                                     timeout=settings.anthropic_timeout_s, max_retries=0)
-        for attempt in range(settings.anthropic_max_retries + 1):
-            if attempt and time.monotonic() - t0 > settings.anthropic_timeout_s:
+    call = PROVIDERS.get(settings.llm_provider)
+    if call is None:
+        error = f"unknown LLM_PROVIDER {settings.llm_provider!r}; use gemini or anthropic"
+    elif settings.llm_enabled:
+        fallback = False
+        for attempt in range(settings.llm_max_retries + 1):
+            if attempt and time.monotonic() - t0 > settings.llm_timeout_s:
                 break  # keep total latency near one timeout, not three
             try:
-                brief, report = validate(_call_claude(client, pack, error), pack)
+                brief, report = validate(call(pack, error, fallback), pack)
                 report["attempts"] = attempt + 1
-                return {"brief": brief.model_dump(), "source": "claude",
-                        "label": f"AI draft ({settings.anthropic_model}) - analyst decides",
+                model = _gemini_model(fallback) if settings.llm_provider == "gemini" else settings.llm_model
+                return {"brief": brief.model_dump(), "source": SOURCE_NAME[settings.llm_provider],
+                        "label": f"AI draft ({model}) - analyst decides",
                         "validation": report, "latency_s": round(time.monotonic() - t0, 2)}
-            except (ValidationError, ValueError, StopIteration) as e:
+            except (ValidationError, ValueError) as e:
                 error = str(e)[:500]
                 log.warning("brief attempt %d failed validation: %s", attempt + 1, error)
-            except (anthropic.APIConnectionError, anthropic.APITimeoutError,
-                    anthropic.RateLimitError, anthropic.APIStatusError) as e:
-                error = f"{type(e).__name__}: {str(e)[:200]}"
+            except LLMUnavailable as e:
+                error = str(e)
                 log.warning("brief attempt %d API error: %s", attempt + 1, error)
-                if isinstance(e, anthropic.APIStatusError) and e.status_code < 500 \
-                        and not isinstance(e, anthropic.RateLimitError):
-                    break  # 4xx other than 429 will not fix itself
+                if not e.retryable:
+                    break
+                fallback = True  # model unavailable: try the fallback model next
     return {"brief": template_brief(pack).model_dump(), "source": "template",
             "label": "AI unavailable - template brief",
             "validation": {"error": error} if error else {},

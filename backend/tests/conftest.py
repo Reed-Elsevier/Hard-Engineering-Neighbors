@@ -11,6 +11,8 @@ import pytest
 
 os.environ["DB_BACKEND"] = "sqlite"
 os.environ["ANTHROPIC_API_KEY"] = ""
+os.environ["GEMINI_API_KEY"] = ""
+os.environ["GOOGLE_API_KEY"] = ""
 os.environ["DECISIONS_DB"] = str(Path(tempfile.mkdtemp()) / "test_decisions.db")
 
 SAMPLES = Path(__file__).parent / "sample_inputs"

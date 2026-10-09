@@ -8,6 +8,7 @@ lightgbm==4.7.0
 shap==0.52.0
 networkx==3.7
 anthropic==1.12.1
+google-genai==2.29.0
 pydantic==2.14.0
 fastapi==0.143.0
 uvicorn[standard]==0.54.0

@@ -24,7 +24,7 @@ Requires Python 3.11+ (developed on 3.14) and Node 20+.
 
 ```bash
 # 1. Secrets
-cp .env.example .env            # then fill ANTHROPIC_API_KEY, AWS_* as needed
+cp .env.example .env            # then fill GEMINI_API_KEY (https://aistudio.google.com/apikey), AWS_* as needed
 
 # 2. Python
 python -m venv .venv
@@ -54,7 +54,7 @@ uvicorn sabwat.api:app --app-dir backend --port 8000   # http://localhost:8000
 
 ## Demo
 
-Open `http://localhost:8000/?id=TXN00000241` to score a transaction on load (alert IDs such as `ALR0000001` work too). The example cards at the top load the four pitch scenarios. Without `ANTHROPIC_API_KEY` the brief uses the labelled template fallback; everything else works offline.
+Open `http://localhost:8000/?id=TXN00000241` to score a transaction on load (alert IDs such as `ALR0000001` work too). The example cards at the top load the four pitch scenarios. The brief is written by Gemini (`LLM_PROVIDER=gemini`, default) or Claude (`LLM_PROVIDER=anthropic`). Without a key, or if the AI is unavailable, it uses the labelled template fallback; everything else works offline.
 
 ## Test
 

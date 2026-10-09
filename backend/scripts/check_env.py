@@ -28,7 +28,9 @@ def main() -> int:
         except ImportError as e:
             ok = check(mod, False, str(e)) and ok
     ok = check("data dir", settings.risk_dir.is_dir(), str(settings.risk_dir)) and ok
-    check("ANTHROPIC_API_KEY", settings.llm_enabled, "unset -> template-brief fallback")
+    key_var = "GEMINI_API_KEY" if settings.llm_provider == "gemini" else "ANTHROPIC_API_KEY"
+    check(f"LLM ({settings.llm_provider}: {settings.llm_model})", settings.llm_enabled,
+          f"{key_var} set" if settings.llm_enabled else f"{key_var} unset -> template-brief fallback")
 
     check("DB_BACKEND", True, settings.db_backend)
     aws_set = all(os.getenv(k) for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"))

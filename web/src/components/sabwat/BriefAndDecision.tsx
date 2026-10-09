@@ -16,7 +16,7 @@ export function BriefPanel({ brief, loading, error }: { brief: BriefResult | nul
       <div>
         <SectionTitle>Case brief</SectionTitle>
         <p className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" /> Claude is drafting the brief from the evidence…
+          <Loader2 className="size-4 animate-spin" /> The AI writer is drafting the brief from the evidence…
         </p>
         <div className="flex flex-col gap-2">
           <Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6" /><Skeleton className="h-4 w-2/3" />
@@ -26,7 +26,7 @@ export function BriefPanel({ brief, loading, error }: { brief: BriefResult | nul
   if (error) return (<div><SectionTitle>Case brief</SectionTitle><p className="text-sm text-destructive">{error}</p></div>)
   if (!brief) return null
   const b = brief.brief
-  const ai = brief.source === "claude"
+  const ai = brief.source !== "template"
   return (
     <div>
       <SectionTitle hint={`${brief.cached ? "cached · " : ""}${brief.latency_s.toFixed(1)} s`}>Case brief</SectionTitle>

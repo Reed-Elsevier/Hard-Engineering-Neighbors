@@ -58,7 +58,7 @@ Input (ID | form | JSON | CSV) → `normalize.py` → `features.py` (lookup prec
 
 * **Offline step** (`backend/scripts/build.py`, run once, \~2 min): builds the graphs, writes `artifacts/graph_features.parquet`, trains and saves `artifacts/model.pkl`, and writes `artifacts/metrics.json`.  
 * **Libraries:** pandas, pyarrow, networkx, lightgbm, shap, scikit-learn, anthropic, pydantic, fastapi, uvicorn, boto3, python-dotenv. Front end: Vite, React, shadcn/ui (preset `b2trkIJUvo`).  
-* **LLM:** Claude via the Anthropic API. Model ID is set in `.env` (default `claude-opus-5-5`, effort `low` for latency). Opus 5.5 has no temperature setting and rejects forced tool use, so output is constrained with structured outputs (a JSON schema) and validated in code. Server-side refusal fallback (`fallbacks: "default"`) is on.  
+* **LLM (AI writer):** pluggable via `LLM_PROVIDER`. Default **Gemini** (`gemini-3.5-flash-lite`, free Google AI Studio key, temperature 0, JSON-schema response), with `gemini-3.1-flash-lite` as fallback when the free tier returns 503. Alternative: **Claude** (`claude-opus-5-5`, effort `low`, structured outputs, refusal fallback). Either way the output is validated in code, and a template brief is used if the AI is unavailable. Free-tier note: Google may use free-tier prompts to improve its products; the evidence pack holds only record IDs and computed facts from synthetic data.
 * **Serving:** one uvicorn process on **port 8000** serves the API at `/api` and the built UI (`web/dist`) at `/`.
 
 ```
@@ -171,6 +171,6 @@ Data/                     # Company Parquet, gitignored, never committed
 * **Network:** Security group opens **8000** to event IPs only.  
 * **Database:** DynamoDB tables `sabwat-decisions` and `sabwat-briefs`, created by `backend/scripts/provision_aws.py`.  
 * **Credentials:** the instance uses the `sabwat-ec2-profile` instance profile (role `sabwat-ec2-role`, DynamoDB access to `sabwat-*` tables only). No AWS keys go in the instance's `.env`. Locally, SSO session keys in `.env` are fine; refresh them when they expire.  
-* **Secrets:** `ANTHROPIC_API_KEY` goes in `.env` on the instance and is never committed.  
+* **Secrets:** `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY`) goes in `.env` on the instance and is never committed.  
 * **Data:** Copied to the instance from the event environment, not from GitHub, S3 or DynamoDB.  
 * **Timing:** Deploy a thin version by hour 3 and redeploy with `git pull` plus a service restart. Keep a local run as the demo fallback.

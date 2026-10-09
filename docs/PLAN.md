@@ -101,7 +101,7 @@ Build (onsite):
 | B4 ✅ | `core/network.py`: layer B signals with record IDs | Demo txn (never alerted, ring) → High via B |
 | B5 ✅ | `core/score.py`: combine A/B, band, `layers_fired` | CLI on 3 IDs: alerted-real, alerted-FP, unalerted-ring |
 | B6 ✅ | `core/normalize.py` + `tests/sample_inputs/` (good, messy, unknown, PHP amount) | pytest green |
-| B7 ✅ (template path tested; Claude path needs `ANTHROPIC_API_KEY`) | `core/evidence.py` + `core/brief.py`: Claude (validated JSON, 20 s timeout, 2 retries) with template fallback; cache in `sabwat-briefs` | Works with the key unset |
+| B7 ✅ (Gemini verified live: 3–6 s, 0 dropped findings; DynamoDB brief cache verified) | `core/evidence.py` + `core/brief.py`: Claude (validated JSON, 20 s timeout, 2 retries) with template fallback; cache in `sabwat-briefs` | Works with the key unset |
 | B8 ✅ | API (+ `/api/record/{id}`, `/api/examples`, alert-ID lookup): `/api/score`, `/api/score/batch`, `/api/decision`, `/api/metrics`, `/api/rules/noisy` | pytest green |
 | B9 ✅ | **One-page UI** (+ `?id=` deep link, results panel, light/dark): input (ID / form / JSON / CSV) → score + "layer fired" → SHAP / signals → ring graph → ownership panel → brief → Escalate/Review/Dismiss | Decision in < 60 s on the demo transaction |
 | B10 | Deploy to EC2 with `sabwat-ec2-profile`; security group opens 8000 to event IPs; phone smoke test; backup recording | Public URL works; decision appears in `sabwat-decisions` |
