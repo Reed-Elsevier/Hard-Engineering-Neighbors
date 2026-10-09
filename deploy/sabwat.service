@@ -1,0 +1,14 @@
+[Unit]
+Description=Sabwat API + UI
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/sabwat
+EnvironmentFile=/home/ubuntu/sabwat/.env
+ExecStart=/home/ubuntu/sabwat/.venv/bin/uvicorn sabwat.api:app --app-dir backend --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
