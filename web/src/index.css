@@ -39,6 +39,16 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+    /* Sabwat data-viz tokens (dataviz reference palette; validated light + dark) */
+    --risk-high: #d03b3b;   /* status: critical */
+    --risk-med: #ec835a;    /* status: serious */
+    --risk-low: #0ca30c;    /* status: good */
+    --link-device: #2a78d6; /* categorical slot 1 */
+    --link-phone: #eb6834;  /* categorical slot 2 */
+    --link-address: #1baf7a;/* categorical slot 3 */
+    --shap-up: #e34948;     /* diverging warm pole: raises likelihood */
+    --shap-down: #2a78d6;   /* diverging cool pole: lowers likelihood */
+    --viz-neutral: #f0efec;
 }
 
 .dark {
@@ -73,9 +83,27 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+    --risk-high: #d03b3b;
+    --risk-med: #ec835a;
+    --risk-low: #0ca30c;
+    --link-device: #3987e5;
+    --link-phone: #d95926;
+    --link-address: #199e70;
+    --shap-up: #e66767;
+    --shap-down: #3987e5;
+    --viz-neutral: #383835;
 }
 
 @theme inline {
+    --color-risk-high: var(--risk-high);
+    --color-risk-med: var(--risk-med);
+    --color-risk-low: var(--risk-low);
+    --color-link-device: var(--link-device);
+    --color-link-phone: var(--link-phone);
+    --color-link-address: var(--link-address);
+    --color-shap-up: var(--shap-up);
+    --color-shap-down: var(--shap-down);
+    --color-viz-neutral: var(--viz-neutral);
     --font-sans: 'Inter Variable', sans-serif;
     --font-heading: 'Outfit Variable', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
