@@ -1,24 +1,30 @@
 #!/usr/bin/env bash
-# One-time EC2 (Ubuntu) setup. Run on the instance from the repo root (~/sabwat).
-# Prereqs: Data/ copied to ~/sabwat/Data from the event environment, and .env filled in.
-# Redeploy later with:  git pull && bash deploy/ec2_setup.sh
+# Server-side setup, run on the instance from ~/sabwat (deploy/push.sh does this for you).
+# Expects: Data/D_risk/*.parquet, web/dist (built on the laptop) and .env without AWS keys.
 set -euo pipefail
 
-sudo apt-get update -y
-sudo apt-get install -y python3-venv python3-pip nodejs npm
+sudo apt-get install -y -qq python3-venv python3-pip >/dev/null
 
-python3 -m venv .venv
-.venv/bin/pip install --upgrade pip
-.venv/bin/pip install -r backend/requirements.txt -e backend
+[ -d .venv ] || python3 -m venv .venv
+.venv/bin/pip install -q --upgrade pip
+.venv/bin/pip install -q -r backend/requirements.txt -e backend
 
-(cd web && npm ci && npm run build)
+# UI is prebuilt on the laptop (no Node needed on the server).
+[ -f web/dist/index.html ] || { echo "web/dist missing: run deploy/push.sh from the laptop"; exit 1; }
 
-if [ -f backend/scripts/build.py ]; then
-  .venv/bin/python backend/scripts/build.py
-fi
+# Network graph, FX table, triage model and metrics (~1 min).
+.venv/bin/python backend/scripts/build.py | tail -3
+
+.venv/bin/python backend/scripts/check_env.py || true
 
 sudo cp deploy/sabwat.service /etc/systemd/system/sabwat.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now sabwat
+sudo systemctl enable sabwat >/dev/null
 sudo systemctl restart sabwat
-sleep 2 && curl -fsS localhost:8000/api/health && echo
+
+# Wait for the engine to load, then show health.
+for i in $(seq 1 60); do
+  curl -fsS localhost:8000/api/health 2>/dev/null | grep -q '"engine_ready":true' && break
+  sleep 2
+done
+curl -fsS localhost:8000/api/health && echo

@@ -76,9 +76,20 @@ python backend/scripts/check_env.py       # should show both tables ACTIVE
 
 ## Deploy (AWS EC2)
 
-Launch the instance with the **`sabwat-ec2-profile`** instance profile and leave `AWS_*` blank in its `.env`. Don't copy personal SSO session keys onto the instance; they are admin-level and expire.
+Two commands from the laptop (Git Bash, fresh AWS keys in `.env`):
 
-See `deploy/ec2_setup.sh`. In short: clone on an Ubuntu instance, copy `Data/` in from the event environment, create `.env`, then `bash deploy/ec2_setup.sh`. It installs dependencies, builds the UI, and runs the app under systemd on port 8000.
+```bash
+python deploy/launch_ec2.py          # sabwat-key, sabwat-web security group (your IP only), t3.small with sabwat-ec2-profile
+bash deploy/push.sh <public-ip>      # ships HEAD + built UI + Data/D_risk parquet + .env without AWS keys, then sets up systemd
+```
+
+The server needs no AWS keys: the instance role (DynamoDB `sabwat-*` only) supplies rotating credentials. Redeploy by committing and re-running `push.sh`. Access control:
+
+```bash
+python deploy/launch_ec2.py --allow <venue-ip>   # add the venue Wi-Fi IP
+python deploy/launch_ec2.py --open-all           # judging window only: port 8000 open to everyone
+python deploy/launch_ec2.py --close-all          # close it again
+```
 
 ## Responsible AI
 

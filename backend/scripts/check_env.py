@@ -34,22 +34,23 @@ def main() -> int:
 
     check("DB_BACKEND", True, settings.db_backend)
     aws_set = all(os.getenv(k) for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"))
-    if check("AWS keys in env", aws_set, "local only; EC2 uses the instance role"):
-        try:
-            import boto3
-            from botocore.exceptions import BotoCoreError, ClientError
+    check("AWS credential source", True, "keys in .env" if aws_set else "profile / instance role")
+    # Always probe: on EC2 the instance role answers without keys.
+    try:
+        import boto3
+        from botocore.exceptions import BotoCoreError, ClientError
 
-            ident = boto3.client("sts").get_caller_identity()
-            check("AWS STS identity", True, ident["Arn"])
-            ddb = boto3.client("dynamodb", region_name=settings.aws_region)
-            for table in (settings.ddb_table_decisions, settings.ddb_table_briefs):
-                try:
-                    status = ddb.describe_table(TableName=table)["Table"]["TableStatus"]
-                    check(f"DynamoDB {table}", status == "ACTIVE", status)
-                except ddb.exceptions.ResourceNotFoundException:
-                    check(f"DynamoDB {table}", False, "missing - run scripts/provision_aws.py")
-        except (BotoCoreError, ClientError) as e:  # expired session token is the usual cause
-            check("AWS STS identity", False, type(e).__name__ + ": " + str(e)[:120])
+        ident = boto3.client("sts", region_name=settings.aws_region).get_caller_identity()
+        check("AWS STS identity", True, ident["Arn"])
+        ddb = boto3.client("dynamodb", region_name=settings.aws_region)
+        for table in (settings.ddb_table_decisions, settings.ddb_table_briefs):
+            try:
+                status = ddb.describe_table(TableName=table)["Table"]["TableStatus"]
+                check(f"DynamoDB {table}", status == "ACTIVE", status)
+            except ddb.exceptions.ResourceNotFoundException:
+                check(f"DynamoDB {table}", False, "missing - run scripts/provision_aws.py")
+    except (BotoCoreError, ClientError) as e:  # expired session token is the usual cause
+        check("AWS STS identity", False, type(e).__name__ + ": " + str(e)[:120])
     return 0 if ok else 1
 
 
