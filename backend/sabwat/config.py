@@ -28,6 +28,7 @@ class Settings:
     decisions_db: Path
     anthropic_api_key: str | None
     anthropic_model: str
+    anthropic_effort: str
     anthropic_timeout_s: float
     anthropic_max_retries: int
     web_dist: Path
@@ -51,7 +52,8 @@ def load_settings() -> Settings:
         artifacts_dir=_path("ARTIFACTS_DIR", "artifacts"),
         decisions_db=_path("DECISIONS_DB", "artifacts/decisions.db"),
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY") or None,
-        anthropic_model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5"),
+        anthropic_model=os.getenv("ANTHROPIC_MODEL", "claude-opus-5-5"),
+        anthropic_effort=os.getenv("ANTHROPIC_EFFORT", "low"),
         anthropic_timeout_s=float(os.getenv("ANTHROPIC_TIMEOUT_S", "20")),
         anthropic_max_retries=int(os.getenv("ANTHROPIC_MAX_RETRIES", "2")),
         web_dist=REPO_ROOT / "web" / "dist",

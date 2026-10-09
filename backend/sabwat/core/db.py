@@ -8,6 +8,7 @@
 import json
 import logging
 import sqlite3
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -128,6 +129,47 @@ def _undecimal(obj):
     if isinstance(obj, dict):
         return {k: _undecimal(v) for k, v in obj.items()}
     return obj
+
+
+class BriefCache:
+    """Caches Claude briefs in DynamoDB (sabwat-briefs) for 24 h, keyed by txn_id + evidence hash.
+
+    Best effort: any AWS error just means a cache miss.
+    """
+
+    TTL_S = 24 * 3600
+
+    def __init__(self):
+        self.table = None
+        if settings.db_backend == "dynamodb":
+            try:
+                import boto3
+
+                self.table = boto3.resource("dynamodb", region_name=settings.aws_region).Table(
+                    settings.ddb_table_briefs)
+            except (BotoCoreError, ClientError) as e:
+                log.warning("brief cache disabled: %s", e)
+
+    def get(self, txn_id: str, key: str) -> dict | None:
+        if self.table is None:
+            return None
+        try:
+            item = self.table.get_item(Key={"txn_id": txn_id}).get("Item")
+        except (BotoCoreError, ClientError) as e:
+            log.warning("brief cache read failed: %s", e)
+            return None
+        if not item or item.get("key") != key or int(item.get("expires_at", 0)) < time.time():
+            return None
+        return json.loads(item["body"])
+
+    def put(self, txn_id: str, key: str, body: dict) -> None:
+        if self.table is None:
+            return
+        try:
+            self.table.put_item(Item={"txn_id": txn_id, "key": key, "body": json.dumps(body),
+                                      "expires_at": int(time.time()) + self.TTL_S})
+        except (BotoCoreError, ClientError) as e:
+            log.warning("brief cache write failed: %s", e)
 
 
 def get_store() -> DecisionStore:
