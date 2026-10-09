@@ -1,0 +1,3 @@
+{"txn_id": "NEW-0001", "account_id": "ACC0021473", "counterparty_account_id": "ACC0033211",
+ "channel": "Online transfer", "amount": 9650.00, "currency": "USD",
+ "txn_ts": "2026-09-30T10:15:00", "is_cross_border": false}

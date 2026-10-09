@@ -1,0 +1,7 @@
+Transaction ID, Acct ,Counterparty,AMT,Currency,Channel,Date,Cross Border
+txn00000241,,,,,,,
+ TXN00081086 ,,,,,,,
+NEW-0002,acc0021473,ACC0033211,"9,700.00",usd,online transfer,2026-09-01,no
+NEW-0002,acc0021473,ACC0033211,"9,700.00",usd,online transfer,2026-09-01,no
+NEW-0003,ACC9999999,,"€8,000",,card,"Sep 30, 2026",yes
+NEW-0004,ACC0046651,,,,wire,2026-09-02,no
